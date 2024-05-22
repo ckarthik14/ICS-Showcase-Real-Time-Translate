@@ -1,24 +1,39 @@
-import logo from './logo.svg';
-import './App.css';
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import Box from '@mui/material/Box';
+import Grid from '@mui/material/Grid';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import Customer from './Customer'; // Component for Customer
+import Agent from './Agent'; // Component for Agent, assuming similar to Customer
+import awsLogo from './assets/aws-logo.png'; // Ensure path is correct
+import { Container } from '@mui/material';
+import Home from './Home';
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <Router>
+      <Container maxWidth="sm" style={{ height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+        <Box style={{ padding: '20px 0', textAlign: 'center' }}>
+          <Grid container alignItems="center" justifyContent="center">
+            <Grid item>
+              <img src={awsLogo} alt="AWS Logo" style={{ height: '30px', marginRight: '10px' }} />
+            </Grid>
+            <Grid item>
+              <Typography variant="h5" component="h1" gutterBottom>
+                Amazon Connect Customer Support
+              </Typography>
+            </Grid>
+          </Grid>
+        </Box>
+        {/* Routing setup for different components */}
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/customer" element={<Customer />} />
+          <Route path="/agent" element={<Agent />} />
+        </Routes>
+      </Container>
+    </Router>
   );
 }
 
