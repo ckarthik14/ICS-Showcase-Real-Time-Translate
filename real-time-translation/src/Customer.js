@@ -1,21 +1,61 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Button from '@mui/material/Button';
-import Typography from '@mui/material/Typography';
 import Container from '@mui/material/Container';
 import Box from '@mui/material/Box';
-import Grid from '@mui/material/Grid';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
-import awsLogo from './assets/aws-logo.png';
 import customerSupportImage from './assets/customer-support.png';
 
 function Customer() {
+  const [connectionWebSocket, setConnectionWebSocket] = useState(null);
+  const [audioWebSocket, setAudioWebSocket] = useState(null);
+  const [isConnected, setIsConnected] = useState(false);
   const [language, setLanguage] = useState('');
 
   const handleChange = (event) => {
     setLanguage(event.target.value);
+  };
+
+  // Connect to WebSocket
+  const openConnectionWebSocket = () => {
+    const websocket = new WebSocket('wss://csum7708d4.execute-api.us-east-1.amazonaws.com/dev/');
+    websocket.onopen = () => {
+      console.log('WebSocket Connected');
+      console.log(websocket.isConnected);
+      setIsConnected(true);
+    };
+    websocket.onclose = () => {
+      console.log('WebSocket Disconnected');
+      setIsConnected(false);
+    };
+    setConnectionWebSocket(websocket);
+  };
+
+  // Effect to establish WebSocket connection on mount
+  useEffect(() => {
+    openConnectionWebSocket();
+
+    return () => {
+      if (connectionWebSocket) {
+        connectionWebSocket.close();
+      }
+    };
+  }, []);
+
+  // Function to initiate a call
+  const initiateCall = () => {
+    if (connectionWebSocket) {
+      connectionWebSocket.send(JSON.stringify({ action: 'sendMessage', message: {id: connectionWebSocket.id, status: "INITIALISED"}}));
+    }
+  };
+
+  // Optional function to close WebSocket explicitly
+  const closeWebSocket = () => {
+    if (connectionWebSocket && isConnected) {
+      connectionWebSocket.close();
+    }
   };
 
   return (
@@ -43,7 +83,7 @@ function Customer() {
         </FormControl>
       </Box>
       <Box style={{ textAlign: 'center', paddingBottom: '50px' }}>
-        <Button variant="contained" color="primary" size="large" style={{ minWidth: 200 }}>
+        <Button onClick={initiateCall} variant="contained" color="primary" size="large" style={{ minWidth: 200 }}>
           Call
         </Button>
       </Box>

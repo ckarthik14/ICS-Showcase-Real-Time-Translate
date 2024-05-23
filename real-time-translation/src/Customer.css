@@ -1,0 +1,31 @@
+.container {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  
+  .imageBox, .formBox, .buttonBox {
+    text-align: center;
+    padding: 20px 0;
+  }
+  
+  .imageBox img {
+    max-width: 100%;
+    height: auto;
+  }
+  
+  .formControl {
+    min-width: 240px;
+    width: 50%;
+    height: 56px;
+  }
+  
+  .buttonBox {
+    padding-bottom: 50px;
+  }
+  
+  .callButton {
+    min-width: 200px;
+  }
+  
