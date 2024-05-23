@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Button from '@mui/material/Button';
 import Container from '@mui/material/Container';
 import Box from '@mui/material/Box';
@@ -9,7 +9,7 @@ import MenuItem from '@mui/material/MenuItem';
 import customerSupportImage from './assets/customer-support.png';
 
 function Customer() {
-  const [connectionWebSocket, setConnectionWebSocket] = useState(null);
+  const connectionWebSocket = useRef(null);
   const [audioWebSocket, setAudioWebSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [language, setLanguage] = useState('');
@@ -20,17 +20,37 @@ function Customer() {
 
   // Connect to WebSocket
   const openConnectionWebSocket = () => {
-    const websocket = new WebSocket('wss://csum7708d4.execute-api.us-east-1.amazonaws.com/dev/');
-    websocket.onopen = () => {
+    if (connectionWebSocket.current) return;
+
+    connectionWebSocket.current = new WebSocket('wss://csum7708d4.execute-api.us-east-1.amazonaws.com/dev/?communicator=CUSTOMER');
+    
+    connectionWebSocket.current.onopen = () => {
       console.log('WebSocket Connected');
-      console.log(websocket.isConnected);
       setIsConnected(true);
     };
-    websocket.onclose = () => {
+
+    connectionWebSocket.current.onclose = () => {
       console.log('WebSocket Disconnected');
       setIsConnected(false);
     };
-    setConnectionWebSocket(websocket);
+
+    return () => {
+      closeWebSocket();
+    };
+  };
+
+  // Function to initiate a call
+  const initiateCall = () => {
+    if (connectionWebSocket.current) {
+      connectionWebSocket.current.send(JSON.stringify({ action: 'sendMessage', message: {status: "INITIALISED"}}));
+    }
+  };
+
+  // Optional function to close WebSocket explicitly
+  const closeWebSocket = () => {
+    if (connectionWebSocket.current && isConnected) {
+      connectionWebSocket.current.close();
+    }
   };
 
   // Effect to establish WebSocket connection on mount
@@ -38,25 +58,9 @@ function Customer() {
     openConnectionWebSocket();
 
     return () => {
-      if (connectionWebSocket) {
-        connectionWebSocket.close();
-      }
+      closeWebSocket();
     };
   }, []);
-
-  // Function to initiate a call
-  const initiateCall = () => {
-    if (connectionWebSocket) {
-      connectionWebSocket.send(JSON.stringify({ action: 'sendMessage', message: {id: connectionWebSocket.id, status: "INITIALISED"}}));
-    }
-  };
-
-  // Optional function to close WebSocket explicitly
-  const closeWebSocket = () => {
-    if (connectionWebSocket && isConnected) {
-      connectionWebSocket.close();
-    }
-  };
 
   return (
     <Container maxWidth="sm" style={{ height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
