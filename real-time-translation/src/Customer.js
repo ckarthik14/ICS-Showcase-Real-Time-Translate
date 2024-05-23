@@ -11,7 +11,7 @@ function Customer() {
   const [isConnectionWebSocketConnected, setIsConnectionWebSocketConnected] = useState(false);
   const [isCallConnected, setIsCallConnected] = useState(false);
   const [isCallConnecting, setIsCallConnecting] = useState(false);
-  const [language, setLanguage] = useState('');
+  const [language, setLanguage] = useState('English');
 
   const handleChange = (event) => {
     setLanguage(event.target.value);
