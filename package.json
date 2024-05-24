@@ -1,0 +1,26 @@
+{
+  "name": "ics-showcase-real-time-translate",
+  "version": "1.0.0",
+  "description": "Real Time Translation of audio on a phone call for UCI ICS Showcase 2024",
+  "main": "index.js",
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ckarthik14/ICS-Showcase-Real-Time-Translate.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ckarthik14/ICS-Showcase-Real-Time-Translate/issues"
+  },
+  "homepage": "https://github.com/ckarthik14/ICS-Showcase-Real-Time-Translate#readme",
+  "dependencies": {
+    "react-scripts": "^5.0.1"
+  }
+}
