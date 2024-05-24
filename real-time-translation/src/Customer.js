@@ -7,6 +7,7 @@ import MenuItem from '@mui/material/MenuItem';
 import customerImage from './assets/customer.png';
 
 function Customer() {
+  // phone call socket
   const connectionWebSocket = useRef(null);
   const [isConnectionWebSocketConnected, setIsConnectionWebSocketConnected] = useState(false);
   
