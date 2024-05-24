@@ -9,6 +9,7 @@ import customerImage from './assets/customer.png';
 function Customer() {
   const connectionWebSocket = useRef(null);
   const [isConnectionWebSocketConnected, setIsConnectionWebSocketConnected] = useState(false);
+  
   const [isCallConnected, setIsCallConnected] = useState(false);
   const [isCallConnecting, setIsCallConnecting] = useState(false);
   const [language, setLanguage] = useState('English');
@@ -17,10 +18,14 @@ function Customer() {
     setLanguage(event.target.value);
   };
 
+  const startTranslation = async () => {
+
+  }
+
   const openConnectionWebSocket = () => {
     if (connectionWebSocket.current) return;
 
-    connectionWebSocket.current = new WebSocket('wss://encgiyvrte.execute-api.us-east-1.amazonaws.com/dev/?communicator=CUSTOMER');
+    connectionWebSocket.current = new WebSocket('wss://encgiyvrte.execute-api.us-east-1.amazonaws.com/dev/?communicator=CUSTOMER&connectionType=PHONE_CALL');
     
     connectionWebSocket.current.onopen = () => {
       console.log('WebSocket Connected');
@@ -34,7 +39,8 @@ function Customer() {
       if (data.message && data.message.status === "ACCEPTED") {
         console.log("Found that call is accepted");
         setIsCallConnected(true);
-        setIsCallConnecting(false);  // Ensure to update connecting state
+        setIsCallConnecting(false);
+        startTranslation();
       }
     };
 

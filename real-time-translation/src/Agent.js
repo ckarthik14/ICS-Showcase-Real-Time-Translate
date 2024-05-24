@@ -16,7 +16,7 @@ function Agent() {
   const openConnectionWebSocket = () => {
     if (connectionWebSocket.current) return;
 
-    connectionWebSocket.current = new WebSocket('wss://encgiyvrte.execute-api.us-east-1.amazonaws.com/dev/?communicator=AGENT');
+    connectionWebSocket.current = new WebSocket('wss://encgiyvrte.execute-api.us-east-1.amazonaws.com/dev/?communicator=AGENT&connectionType=PHONE_CALL');
     
     connectionWebSocket.current.onopen = () => {
       console.log('WebSocket Connected');
