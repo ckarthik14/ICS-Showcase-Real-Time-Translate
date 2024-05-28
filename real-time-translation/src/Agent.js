@@ -1,13 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Container, Button, Box, Grid, Typography, MenuItem, InputLabel, FormControl, Select } from '@mui/material';
 import customerSupportImage from './assets/customer-support.png';
+import AgentAudioPlayer from './AgentAudioPlayer';
 
 function Agent() {
+
+  // establish phone call
   const connectionWebSocket = useRef(null);
   const [isConnectionWebSocketConnected, setIsConnectionWebSocketConnected] = useState(false);
   const [isCallIncoming, setIsCallIncoming] = useState(false);
   const [isCallConnected, setIsCallConnected] = useState(false);
   const [language, setLanguage] = useState('English');
+
+  // receive audio
+  const { openAgentAudioSocket, closeAgentAudioSocket } = AgentAudioPlayer("wss://encgiyvrte.execute-api.us-east-1.amazonaws.com/dev/?communicator=AGENT_RECEIVER&connectionType=TRANSLATED_AUDIO");
 
   const handleChange = (event) => {
     setLanguage(event.target.value);
@@ -30,6 +36,7 @@ function Agent() {
       if (data.message && data.message.status === "INITIALISED") {
         console.log("Found that call is initialised");
         setIsCallIncoming(true);
+        await openAgentAudioSocket();
       }
     };
 
@@ -60,6 +67,7 @@ function Agent() {
 
     return () => {
       closeWebSocket();
+      closeAgentAudioSocket();
     };
   }, []);
 

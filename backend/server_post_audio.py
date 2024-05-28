@@ -6,7 +6,6 @@ from base64 import b64encode, b64decode
 
 def on_message(ws, message):
     # Assuming the message is audio data bytes
-    print("Received message: " + message)
     audio = json.loads(message)["audio_data"]
 
     stream_name = 'ICS_Showcase_from_customer_audio'
@@ -14,8 +13,6 @@ def on_message(ws, message):
 
     # Initialize a Kinesis client
     kinesis_client = boto3.client('kinesis')
-
-    print("Audio: ", audio)
 
     # Send data to Kinesis
     try:
