@@ -7,7 +7,7 @@ function Agent() {
   const [isConnectionWebSocketConnected, setIsConnectionWebSocketConnected] = useState(false);
   const [isCallIncoming, setIsCallIncoming] = useState(false);
   const [isCallConnected, setIsCallConnected] = useState(false);
-  const [language, setLanguage] = useState('');
+  const [language, setLanguage] = useState('English');
 
   const handleChange = (event) => {
     setLanguage(event.target.value);
@@ -16,7 +16,7 @@ function Agent() {
   const openConnectionWebSocket = () => {
     if (connectionWebSocket.current) return;
 
-    connectionWebSocket.current = new WebSocket('wss://encgiyvrte.execute-api.us-east-1.amazonaws.com/dev/?communicator=AGENT');
+    connectionWebSocket.current = new WebSocket('wss://encgiyvrte.execute-api.us-east-1.amazonaws.com/dev/?communicator=AGENT&connectionType=PHONE_CALL');
     
     connectionWebSocket.current.onopen = () => {
       console.log('WebSocket Connected');
@@ -96,8 +96,9 @@ function Agent() {
           </Select>
         </FormControl>
       </Box>
+      <Box style={{ textAlign: 'center', paddingBottom: '50px' }}>
       {isCallIncoming && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', gap: '60px', position: 'absolute', bottom: '30%', width: '100%' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', gap: '100px' }}>  {/* Increased gap between buttons */}
           <Button variant="contained" color="success" onClick={acceptCall}>
             Accept
           </Button>
@@ -106,13 +107,17 @@ function Agent() {
           </Button>
         </Box>
       )}
+      {!isCallIncoming && !isCallConnected && (
+          <Button variant="contained" color="success" disabled>
+            No Calls at the moment
+          </Button>
+      )}
       {isCallConnected && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', position: 'absolute', bottom: '30%', width: '100%' }}>
           <Button variant="contained" color="success" disabled>
             Connected
           </Button>
-        </Box>
       )}
+      </Box>
     </Container>
   );
 }
