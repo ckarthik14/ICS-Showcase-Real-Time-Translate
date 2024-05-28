@@ -6,10 +6,8 @@ const Translation = () => {
     const startTranslation = async (translationParams) => {
         const event = {
             streamARN: contactAttributes.streamARN,
-            startFragmentNum: contactAttributes.startFragmentNum,
 
             // Just some unique ID to distinguish the call. Required for translation to work correctly
-            connectContactId: contactAttributes.connectContactId,
             transcribeCall: "false",
             saveCallRecording: "false",
             transcribeLanguageCode: "en-US",

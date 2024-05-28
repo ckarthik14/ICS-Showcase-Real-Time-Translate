@@ -2,20 +2,26 @@ import websocket
 import boto3
 import json
 
+from base64 import b64encode, b64decode
+
 def on_message(ws, message):
     # Assuming the message is audio data bytes
-    print("Received audio: " + message)
+    print("Received message: " + message)
+    audio = json.loads(message)["audio_data"]
+
     stream_name = 'ICS_Showcase_from_customer_audio'
     partition_key = 'audio'  # This should be specific to your use case
 
     # Initialize a Kinesis client
     kinesis_client = boto3.client('kinesis')
 
+    print("Audio: ", audio)
+
     # Send data to Kinesis
     try:
         response = kinesis_client.put_record(
             StreamName=stream_name,
-            Data=message,  # message is the byte array received from WebSocket
+            Data=audio,  # base64 audio
             PartitionKey=partition_key
         )
         print("Successfully sent data to Kinesis Data Stream:", response)

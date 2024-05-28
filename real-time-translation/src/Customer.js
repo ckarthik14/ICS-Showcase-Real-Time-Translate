@@ -5,7 +5,8 @@ import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import customerImage from './assets/customer.png';
-import MicrophoneStream from 'microphone-stream';
+
+import lamejs from 'lamejs';
 
 function Customer() {
   // phone call socket
@@ -15,8 +16,11 @@ function Customer() {
   const rawAudioWebSocket = useRef(null);
   const [isRawAudioWebSocketConnected, setIsRawAudioWebSocketConnected] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const micStreamRef = useRef(null);
   const mediaRecorderRef = useRef(null);
-  
+  const firstSeqNumRef = useRef(null);
+  const audioContext = useRef(null);
+
   const [isCallConnected, setIsCallConnected] = useState(false);
   const [isCallConnecting, setIsCallConnecting] = useState(false);
   const [language, setLanguage] = useState('English');
@@ -45,7 +49,7 @@ function Customer() {
         console.log("Found that call is accepted");
         setIsCallConnected(true);
         setIsCallConnecting(false);
-        startTranslationAlt();
+        startMicStream();
       }
     };
 
@@ -67,7 +71,7 @@ function Customer() {
       console.log('Raw Audio WebSocket Connected');
     };
 
-    rawAudioWebSocket.current.onmessage = () => {
+    rawAudioWebSocket.current.onmessage = async (event) => {
     };
 
     rawAudioWebSocket.current.onclose = () => {
@@ -112,10 +116,9 @@ function Customer() {
               console.log("Audio blob: ", event.data);
               const base64String = await blobToBase64(event.data); // Convert ArrayBuffer to Base64
 
-              console.log("Base64 audio data created and sending via WebSocket");
               rawAudioWebSocket.current.send(JSON.stringify({
                   action: 'rawAudio',
-                  message: { communicator: "CUSTOMER_RAW", audio_data: base64String }
+                  message: { "communicator": "CUSTOMER_RAW", "audio_data": base64String }
               }));
             }
         });
@@ -126,53 +129,56 @@ function Customer() {
         console.error('Failed to start recording:', err);
         setIsRecording(false); // Ensure recording state is off if setup fails
     }
-};
+  };
 
-const startTranslationAlt = async () => {
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      console.error('getUserMedia not supported on this browser!');
-      setIsRecording(false);
-      return;
+
+  const setupAudioProcessing = (stream) => {
+    const source = audioContext.current.createMediaStreamSource(stream);
+    const processor = audioContext.current.createScriptProcessor(4096, 1, 1); // buffer size, input channels, output channels
+
+    processor.onaudioprocess = (e) => {
+      if (rawAudioWebSocket.current && rawAudioWebSocket.current.readyState === WebSocket.OPEN) {
+          const inputData = e.inputBuffer.getChannelData(0); // get mono channel data
+          const output = new Int16Array(inputData.length);
+          for (let i = 0; i < inputData.length; i++) {
+              // convert float32 audio data to int16
+              output[i] = inputData[i] * 0x7FFF; // scale float32 to int16 range
+          }
+  
+          // Convert Int16Array to Blob
+          const blob = new Blob([output], { type: 'application/octet-stream' });
+  
+          // Create a FileReader to read the Blob as a base64 string
+          const reader = new FileReader();
+          reader.onloadend = () => {
+              const base64data = reader.result.split(',')[1];
+              
+              // Send the base64 encoded string over the WebSocket
+              rawAudioWebSocket.current.send(JSON.stringify({
+                  action: 'rawAudio',
+                  message: { "communicator": "CUSTOMER_RAW", "audio_data": base64data }
+              }));
+          };
+          reader.readAsDataURL(blob);
+      }
+    };
+  
+    source.connect(processor);
+    processor.connect(audioContext.current.destination);
+  };
+
+
+  const startMicStream = async () => {
+    navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(setupAudioProcessing)
+        .catch(err => console.error('Error accessing the microphone:', err));
   }
 
-  try {
-    const stream = await getUserMedia({ audio: true, video: false });
-    const micStream = new MicrophoneStream();
-    micStreamRef.current = micStream;
-    micStream.setStream(stream);
-
-    micStream.on('data', (chunk) => {
-        const raw = MicrophoneStream.toRaw(chunk); // Convert chunk to raw audio data
-        if (rawAudioWebSocket.current.readyState === WebSocket.OPEN) {
-            // Convert raw audio to base64 string
-            const base64String = btoa(String.fromCharCode(...new Uint8Array(raw)));
-            rawAudioWebSocket.current.send(JSON.stringify({
-                action: 'rawAudio',
-                message: { communicator: "CUSTOMER_RAW", audio_data: base64String }
-            }));
-        }
-    });
-
-    micStream.on('format', (format) => {
-        console.log('Audio format:', format);
-    });
-
-    setIsRecording(true);
-} catch (error) {
-    console.error('Failed to start recording:', error);
-}
-};
-
-
-const stopRecording = () => {
-    if (mediaRecorderRef.current) {
-        mediaRecorderRef.current.stop(); // This triggers the 'ondataavailable' event
-        mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
-        setIsRecording(false);
-    }
-};
-
   const initiateCall = () => {
+    audioContext.current = new (window.AudioContext || window.webkitAudioContext)({
+      sampleRate: 16000 // setting the sample rate to 16kHz
+    });
+
     if (connectionWebSocket.current) {
       setIsCallConnecting(true);
       connectionWebSocket.current.send(JSON.stringify({ action: 'sendMessage', message: {communicator: "CUSTOMER", status: "INITIALISED"}}));
@@ -194,10 +200,18 @@ const stopRecording = () => {
   useEffect(() => {
     openConnectionWebSocket();
     openRawAudioWebSocket();
+    firstSeqNumRef.current = null;
 
     return () => {
       closeConnectionWebSocket();
       closeRawAudioWebSocket();
+      
+      if (audioContext.current) {
+        audioContext.current.close().then(() => {
+            console.log('AudioContext closed');
+            audioContext = null;  // Set to null if you keep a reference in a variable
+        });
+      }
     };
   }, []);
 
