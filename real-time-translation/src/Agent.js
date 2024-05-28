@@ -1,19 +1,82 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Container, Button, Box, Grid, Typography, MenuItem, InputLabel, FormControl, Select } from '@mui/material';
 import customerSupportImage from './assets/customer-support.png';
-import AgentAudioPlayer from './AgentAudioPlayer';
 
 function Agent() {
+  // Used for speaking and listening
+  const audioContextRef = useRef(null);
 
-  // establish phone call
+  // Audio Player Setup
+  const nextTimeRef = useRef(0);
+  const socket = useRef(null);
+
+  const createAudioContext = () => {
+    if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
+      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      console.log('Audio context initialized');
+    }
+  };
+
+  const openAgentAudioSocket = async () => {
+    const wsUrl = "wss://encgiyvrte.execute-api.us-east-1.amazonaws.com/dev/?communicator=AGENT_RECEIVER&connectionType=TRANSLATED_AUDIO";
+    socket.current = new WebSocket(wsUrl);
+    
+    createAudioContext();
+
+    socket.current.onmessage = async (event) => {
+      const data = JSON.parse(event.data);
+      const binaryString = window.atob(data.audio_data);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+
+      if (audioContextRef.current) {
+        const audioBuffer = await audioContextRef.current.decodeAudioData(bytes.buffer);
+        playAudio(audioBuffer);
+      }
+    };
+
+    socket.current.onopen = () => {
+      console.log('WebSocket Connected');
+    };
+
+    socket.current.onerror = (error) => {
+      console.error('WebSocket Error:', error);
+    };
+
+    socket.current.onclose = () => {
+      console.log('WebSocket Disconnected');
+    };
+  };
+
+  const closeAgentAudioSocket = () => {
+    if (socket.current) {
+      socket.current.close();
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+    }
+    nextTimeRef.current = 0;
+  };
+
+  const playAudio = (audioBuffer) => {
+    const source = audioContextRef.current.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(audioContextRef.current.destination);
+    const currentTime = audioContextRef.current.currentTime;
+    const nextTime = nextTimeRef.current > currentTime ? nextTimeRef.current : currentTime;
+    source.start(nextTime);
+    nextTimeRef.current = nextTime + audioBuffer.duration;
+  };
+
+  // Agent Communication Setup
   const connectionWebSocket = useRef(null);
   const [isConnectionWebSocketConnected, setIsConnectionWebSocketConnected] = useState(false);
   const [isCallIncoming, setIsCallIncoming] = useState(false);
   const [isCallConnected, setIsCallConnected] = useState(false);
   const [language, setLanguage] = useState('English');
-
-  // receive audio
-  const { openAgentAudioSocket, closeAgentAudioSocket } = AgentAudioPlayer("wss://encgiyvrte.execute-api.us-east-1.amazonaws.com/dev/?communicator=AGENT_RECEIVER&connectionType=TRANSLATED_AUDIO");
 
   const handleChange = (event) => {
     setLanguage(event.target.value);
@@ -22,7 +85,8 @@ function Agent() {
   const openConnectionWebSocket = () => {
     if (connectionWebSocket.current) return;
 
-    connectionWebSocket.current = new WebSocket('wss://encgiyvrte.execute-api.us-east-1.amazonaws.com/dev/?communicator=AGENT&connectionType=PHONE_CALL');
+    const wsUrl = 'wss://encgiyvrte.execute-api.us-east-1.amazonaws.com/dev/?communicator=AGENT&connectionType=PHONE_CALL';
+    connectionWebSocket.current = new WebSocket(wsUrl);
     
     connectionWebSocket.current.onopen = () => {
       console.log('WebSocket Connected');
@@ -32,11 +96,10 @@ function Agent() {
     connectionWebSocket.current.onmessage = async (event) => {
       console.log('Received message', event);
       const data = JSON.parse(event.data);
-
       if (data.message && data.message.status === "INITIALISED") {
         console.log("Found that call is initialised");
         setIsCallIncoming(true);
-        await openAgentAudioSocket();
+        openAgentAudioSocket();
       }
     };
 
@@ -44,7 +107,7 @@ function Agent() {
       console.log('WebSocket Disconnected');
       setIsConnectionWebSocketConnected(false);
       setIsCallIncoming(false);
-      setIsCallConnected(false); // Reset on disconnect
+      setIsCallConnected(false);
     };
   };
 
@@ -56,7 +119,7 @@ function Agent() {
     }
   };
 
-  const closeWebSocket = () => {
+  const closeConnectionWebSocket = () => {
     if (connectionWebSocket.current && isConnectionWebSocketConnected) {
       connectionWebSocket.current.close();
     }
@@ -64,9 +127,8 @@ function Agent() {
 
   useEffect(() => {
     openConnectionWebSocket();
-
     return () => {
-      closeWebSocket();
+      closeConnectionWebSocket();
       closeAgentAudioSocket();
     };
   }, []);
@@ -110,7 +172,7 @@ function Agent() {
           <Button variant="contained" color="success" onClick={acceptCall}>
             Accept
           </Button>
-          <Button variant="contained" color="error" onClick={closeWebSocket}>
+          <Button variant="contained" color="error" onClick={closeConnectionWebSocket}>
             Reject
           </Button>
         </Box>
