@@ -10,18 +10,6 @@ import lamejs from 'lamejs';
 import Translation from './Translation';
 
 function Customer() {
-  // audio context
-  const audioContextRef = useRef(null);
-
-  const createAudioContext = () => {
-    if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
-      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
-        sampleRate: 16000 // setting the sample rate to 16kHz
-      });
-      console.log('Audio context initialized');
-    }
-  }
-
   // phone call socket
   const connectionWebSocket = useRef(null);
   const [isConnectionWebSocketConnected, setIsConnectionWebSocketConnected] = useState(false);
@@ -31,6 +19,11 @@ function Customer() {
   // transmit raw audio
   const rawAudioWebSocket = useRef(null);
   const [isRawAudioWebSocketConnected, setIsRawAudioWebSocketConnected] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const micStreamRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const firstSeqNumRef = useRef(null);
+  const audioContext = useRef(null);
 
   // trigger lambda
   const { triggerLambda } = Translation();
@@ -62,9 +55,8 @@ function Customer() {
         console.log("Found that call is accepted");
         setIsCallConnected(true);
         setIsCallConnecting(false);
+        triggerLambda("arn:aws:kinesis:us-east-1:471112798145:stream/ICS_Showcase_from_customer_audio_final", "CUSTOMER");
         startMicStream();
-        createAudioContext();
-        triggerLambda("arn:aws:kinesis:us-east-1:471112798145:stream/ICS_Showcase_from_customer_audio_final/", "CUSTOMER", language, null);
       }
     };
 
@@ -84,7 +76,6 @@ function Customer() {
     
     rawAudioWebSocket.current.onopen = () => {
       console.log('Raw Audio WebSocket Connected');
-      setIsRawAudioWebSocketConnected(true);
     };
 
     rawAudioWebSocket.current.onmessage = async (event) => {
@@ -92,13 +83,65 @@ function Customer() {
 
     rawAudioWebSocket.current.onclose = () => {
       console.log('Raw Audio WebSocket Disconnected');
-      setIsRawAudioWebSocketConnected(false);
     };
   };
 
+
+
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(blob);
+      reader.onload = () => {
+        // The result attribute contains the data as a base64-encoded string
+        let base64String = reader.result;
+        // To extract the base64 string, you might want to remove the prefix
+        // e.g., 'data:audio/webm;base64,' to get only the base64 data
+        console.log(base64String);
+        base64String = base64String.split(',')[1];
+        resolve(base64String);
+      };
+      reader.onerror = error => {
+        reject(error);
+      };
+    });
+  }
+
+  const startTranslation = async () => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.error('getUserMedia not supported on this browser!');
+        setIsRecording(false);
+        return;
+    }
+
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        mediaRecorderRef.current = new MediaRecorder(stream);
+
+        mediaRecorderRef.current.addEventListener('dataavailable', async event => {
+            if (event.data.size > 0 && rawAudioWebSocket.current.readyState === WebSocket.OPEN) {
+              console.log("Audio blob: ", event.data);
+              const base64String = await blobToBase64(event.data); // Convert ArrayBuffer to Base64
+
+              rawAudioWebSocket.current.send(JSON.stringify({
+                  action: 'rawAudio',
+                  message: { "communicator": "CUSTOMER_RAW", "audio_data": base64String }
+              }));
+            }
+        });
+
+        mediaRecorderRef.current.start(1000); // Collect 1 second chunks of audio
+        setIsRecording(true);
+    } catch (err) {
+        console.error('Failed to start recording:', err);
+        setIsRecording(false); // Ensure recording state is off if setup fails
+    }
+  };
+
+
   const setupAudioProcessing = (stream) => {
-    const source = audioContextRef.current.createMediaStreamSource(stream);
-    const processor = audioContextRef.current.createScriptProcessor(4096, 1, 1); // buffer size, input channels, output channels
+    const source = audioContext.current.createMediaStreamSource(stream);
+    const processor = audioContext.current.createScriptProcessor(4096, 1, 1); // buffer size, input channels, output channels
 
     processor.onaudioprocess = (e) => {
       if (rawAudioWebSocket.current && rawAudioWebSocket.current.readyState === WebSocket.OPEN) {
@@ -128,7 +171,7 @@ function Customer() {
     };
   
     source.connect(processor);
-    processor.connect(audioContextRef.current.destination);
+    processor.connect(audioContext.current.destination);
   };
 
 
@@ -139,6 +182,10 @@ function Customer() {
   }
 
   const initiateCall = () => {
+    audioContext.current = new (window.AudioContext || window.webkitAudioContext)({
+      sampleRate: 16000 // setting the sample rate to 16kHz
+    });
+
     if (connectionWebSocket.current) {
       setIsCallConnecting(true);
       connectionWebSocket.current.send(JSON.stringify({ action: 'sendMessage', message: {communicator: "CUSTOMER", status: "INITIALISED", customer_lang: language}}));
@@ -157,85 +204,21 @@ function Customer() {
     }
   };
 
-
-  const closeAudioContext = () => {
-    if (audioContextRef.current) {
-      audioContextRef.current.close().then(() => {
-          console.log('AudioContext closed');
-      });
-    }
-  }
-
-  // play translated audio
-  // Audio Player Setup
-  const nextTimeRef = useRef(0);
-  const translatedAudioSocket = useRef(null);
-  const [isTranslatedAudioSocketConnected, setIsTranslatedAudioSocketConnected] = useState(false);
-
-  const openCustomerAudioSocket = async () => {
-    if (translatedAudioSocket.current) return;
-
-    translatedAudioSocket.current = new WebSocket("wss://encgiyvrte.execute-api.us-east-1.amazonaws.com/dev/?communicator=CUSTOMER_RECEIVER&connectionType=TRANSLATED_AUDIO");
-
-    translatedAudioSocket.current.onmessage = async (event) => {
-      console.log("Audio data: ", data);
-      const data = JSON.parse(event.data);
-      const binaryString = window.atob(data.audio_data);
-      const len = binaryString.length;
-      const bytes = new Uint8Array(len);
-      for (let i = 0; i < len; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-
-      if (audioContextRef.current) {
-        const audioBuffer = await audioContextRef.current.decodeAudioData(bytes.buffer);
-        playAudio(audioBuffer);
-      }
-    };
-
-    translatedAudioSocket.current.onopen = () => {
-      console.log('Translated Audio WebSocket Connected');
-      setIsTranslatedAudioSocketConnected(true);
-    };
-
-    translatedAudioSocket.current.onerror = (error) => {
-      console.error('Translated Audio WebSocket Error:', error);
-    };
-
-    translatedAudioSocket.current.onclose = () => {
-      console.log('Translated Audio WebSocket Disconnected');
-      setIsTranslatedAudioSocketConnected(false);
-    };
-  };
-
-  const closeCustomerAudioSocket = () => {
-    if (translatedAudioSocket.current && isTranslatedAudioSocketConnected) {
-      translatedAudioSocket.current.close();
-    }
-    closeAudioContext();
-    nextTimeRef.current = 0;
-  };
-
-  const playAudio = (audioBuffer) => {
-    const source = audioContextRef.current.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(audioContextRef.current.destination);
-    const currentTime = audioContextRef.current.currentTime;
-    const nextTime = nextTimeRef.current > currentTime ? nextTimeRef.current : currentTime;
-    source.start(nextTime);
-    nextTimeRef.current = nextTime + audioBuffer.duration;
-  };
-
-
   useEffect(() => {
     openConnectionWebSocket();
     openRawAudioWebSocket();
-    openCustomerAudioSocket();
+    firstSeqNumRef.current = null;
 
     return () => {
       closeConnectionWebSocket();
       closeRawAudioWebSocket();
-      closeCustomerAudioSocket();
+      
+      if (audioContext.current) {
+        audioContext.current.close().then(() => {
+            console.log('AudioContext closed');
+            audioContext = null;  // Set to null if you keep a reference in a variable
+        });
+      }
     };
   }, []);
 

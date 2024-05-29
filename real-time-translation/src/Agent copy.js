@@ -1,42 +1,30 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Container, Button, Box, Grid, Typography, MenuItem, InputLabel, FormControl, Select } from '@mui/material';
 import customerSupportImage from './assets/customer-support.png';
-import Translation from './Translation';
 
 function Agent() {
   // Used for speaking and listening
   const audioContextRef = useRef(null);
 
-  const closeAudioContext = () => {
-    if (audioContextRef.current) {
-      audioContextRef.current.close().then(() => {
-          console.log('AudioContext closed');
-      });
-    }
-  }
-
   // Audio Player Setup
   const nextTimeRef = useRef(0);
   const translatedAudioSocket = useRef(null);
-  const [isTranslatedAudioSocketConnected, setIsTranslatedAudioSocketConnected] = useState(false);
 
   const createAudioContext = () => {
     if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
-      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
-        sampleRate: 16000 // setting the sample rate to 16kHz
-      });
+      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
       console.log('Audio context initialized');
     }
-  }
+  };
 
   const openAgentAudioSocket = async () => {
-    if (translatedAudioSocket.current) return;
-
-    translatedAudioSocket.current = new WebSocket("wss://encgiyvrte.execute-api.us-east-1.amazonaws.com/dev/?communicator=AGENT_RECEIVER&connectionType=TRANSLATED_AUDIO");
+    const wsUrl = "wss://encgiyvrte.execute-api.us-east-1.amazonaws.com/dev/?communicator=AGENT_RECEIVER&connectionType=TRANSLATED_AUDIO";
+    translatedAudioSocket.current = new WebSocket(wsUrl);
+    
+    createAudioContext();
 
     translatedAudioSocket.current.onmessage = async (event) => {
       const data = JSON.parse(event.data);
-      console.log("Audio data: ", data);
       const binaryString = window.atob(data.audio_data);
       const len = binaryString.length;
       const bytes = new Uint8Array(len);
@@ -52,7 +40,6 @@ function Agent() {
 
     translatedAudioSocket.current.onopen = () => {
       console.log('Translated Audio WebSocket Connected');
-      setIsTranslatedAudioSocketConnected(true);
     };
 
     translatedAudioSocket.current.onerror = (error) => {
@@ -61,15 +48,16 @@ function Agent() {
 
     translatedAudioSocket.current.onclose = () => {
       console.log('Translated Audio WebSocket Disconnected');
-      setIsTranslatedAudioSocketConnected(false);
     };
   };
 
   const closeAgentAudioSocket = () => {
-    if (translatedAudioSocket.current && isTranslatedAudioSocketConnected) {
+    if (translatedAudioSocket.current) {
       translatedAudioSocket.current.close();
     }
-    closeAudioContext();
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+    }
     nextTimeRef.current = 0;
   };
 
@@ -83,86 +71,12 @@ function Agent() {
     nextTimeRef.current = nextTime + audioBuffer.duration;
   };
 
-  // transmit raw audio
-  const rawAudioWebSocket = useRef(null);
-  const [isRawAudioWebSocketConnected, setIsRawAudioWebSocketConnected] = useState(false);
-
-  const openRawAudioWebSocket = () => {
-    if (rawAudioWebSocket.current) return;
-
-    rawAudioWebSocket.current = new WebSocket('wss://encgiyvrte.execute-api.us-east-1.amazonaws.com/dev/?communicator=AGENT_RAW&connectionType=RAW_AUDIO');
-    
-    rawAudioWebSocket.current.onopen = () => {
-      console.log('Raw Audio WebSocket Connected');
-      setIsRawAudioWebSocketConnected(true);
-    };
-
-    rawAudioWebSocket.current.onmessage = async (event) => {
-    };
-
-    rawAudioWebSocket.current.onclose = () => {
-      console.log('Raw Audio WebSocket Disconnected');
-      setIsRawAudioWebSocketConnected(false);
-    };
-  };
-
-  const setupAudioProcessing = (stream) => {
-    const source = audioContextRef.current.createMediaStreamSource(stream);
-    const processor = audioContextRef.current.createScriptProcessor(4096, 1, 1); // buffer size, input channels, output channels
-
-    processor.onaudioprocess = (e) => {
-      if (rawAudioWebSocket.current && rawAudioWebSocket.current.readyState === WebSocket.OPEN) {
-          const inputData = e.inputBuffer.getChannelData(0); // get mono channel data
-          const output = new Int16Array(inputData.length);
-          for (let i = 0; i < inputData.length; i++) {
-              // convert float32 audio data to int16
-              output[i] = inputData[i] * 0x7FFF; // scale float32 to int16 range
-          }
-  
-          // Convert Int16Array to Blob
-          const blob = new Blob([output], { type: 'application/octet-stream' });
-  
-          // Create a FileReader to read the Blob as a base64 string
-          const reader = new FileReader();
-          reader.onloadend = () => {
-              const base64data = reader.result.split(',')[1];
-              
-              // Send the base64 encoded string over the WebSocket
-              rawAudioWebSocket.current.send(JSON.stringify({
-                  action: 'rawAudio',
-                  message: { "communicator": "CUSTOMER_RAW", "audio_data": base64data }
-              }));
-          };
-          reader.readAsDataURL(blob);
-      }
-    };
-  
-    source.connect(processor);
-    processor.connect(audioContextRef.current.destination);
-  };
-
-
-  const startMicStream = async () => {
-    navigator.mediaDevices.getUserMedia({ audio: true })
-        .then(setupAudioProcessing)
-        .catch(err => console.error('Error accessing the microphone:', err));
-  }
-
-  const closeRawAudioWebSocket = () => {
-    if (rawAudioWebSocket.current && isRawAudioWebSocketConnected) {
-      rawAudioWebSocket.current.close();
-    }
-  };
-
   // Agent Communication Setup
   const connectionWebSocket = useRef(null);
   const [isConnectionWebSocketConnected, setIsConnectionWebSocketConnected] = useState(false);
   const [isCallIncoming, setIsCallIncoming] = useState(false);
   const [isCallConnected, setIsCallConnected] = useState(false);
   const [language, setLanguage] = useState('English');
-
-  // trigger lambda
-  const { triggerLambda } = Translation();
 
   const handleChange = (event) => {
     setLanguage(event.target.value);
@@ -185,6 +99,7 @@ function Agent() {
       if (data.message && data.message.status === "INITIALISED") {
         console.log("Found that call is initialised");
         setIsCallIncoming(true);
+        openAgentAudioSocket();
       }
     };
 
@@ -201,9 +116,6 @@ function Agent() {
       setIsCallConnected(true);
       setIsCallIncoming(false);
       connectionWebSocket.current.send(JSON.stringify({ action: 'sendMessage', message: {communicator: "AGENT", status: "ACCEPTED", agent_lang: language}}));
-      startMicStream();
-      createAudioContext();
-      triggerLambda("arn:aws:kinesis:us-east-1:471112798145:stream/ICS_Showcase_from_agent_audio/", "AGENT", null, language);
     }
   };
 
@@ -215,14 +127,9 @@ function Agent() {
 
   useEffect(() => {
     openConnectionWebSocket();
-    openRawAudioWebSocket();
-    openAgentAudioSocket();
-
     return () => {
       closeConnectionWebSocket();
-      closeRawAudioWebSocket();
       closeAgentAudioSocket();
-      closeAudioContext();
     };
   }, []);
 
