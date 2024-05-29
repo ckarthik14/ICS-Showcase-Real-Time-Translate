@@ -1,28 +1,18 @@
 import { useState } from 'react';
 
 const Translation = () => {
-    const [data, setData] = useState({});
-
-    const startTranslation = async (translationParams) => {
+    const triggerLambda = async (streamArn, communicator, customer_language, agent_language) => {
         const event = {
-            streamARN: contactAttributes.streamARN,
-
-            // Just some unique ID to distinguish the call. Required for translation to work correctly
-            transcribeCall: "false",
-            saveCallRecording: "false",
-            transcribeLanguageCode: "en-US",
-            translateFromLanguageCode: "en",
-            translateToLanguageCode: "es",
-            pollyLanguageCode: "es-ES",
-            pollyVoiceId: "Lucia",
-            streamAudioFromCustomer: "true",
-            streamAudioToCustomer: "false",
-            customerPhoneNumber: contactAttributes.customerPhoneNumber,
+            "streamARN": streamArn,
+            "communicator": communicator,
+            "receiver": communicator === "CUSTOMER" ? "AGENT_RECEIVER" : "CUSTOMER_RECEIVER",
+            "customer_language": customer_language,
+            "agent_language": agent_language
         };
 
         console.log('Event transmitted: ' + JSON.stringify(event));
 
-        const response = await fetch('https://jei62447y0.execute-api.us-east-1.amazonaws.com/dev/triggerLambda', {
+        const response = await fetch('https://oi30kkudw4.execute-api.us-east-1.amazonaws.com/dev/triggerLambda' , {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -32,10 +22,9 @@ const Translation = () => {
 
         const jsonData = await response.json();
         console.log('Lambda response: ' + JSON.stringify(jsonData));
-        setData(jsonData);
     };
 
-    return { data, triggerFromCustomerTranslation };
+    return { triggerLambda };
 };
 
-export default useLambdaTrigger;
+export default Translation;
