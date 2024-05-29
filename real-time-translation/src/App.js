@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
@@ -11,7 +12,6 @@ import Home from './Home';
 
 function App() {
   return (
-    <Router>
       <Container maxWidth="sm" style={{ height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
         <Box style={{ padding: '20px 0', textAlign: 'center' }}>
           <Grid container alignItems="center" justifyContent="center">
@@ -25,14 +25,15 @@ function App() {
             </Grid>
           </Grid>
         </Box>
-        {/* Routing setup for different components */}
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/customer" element={<Customer />} />
-          <Route path="/agent" element={<Agent />} />
-        </Routes>
+        <Router>
+          {/* Routing setup for different components */}
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/customer" element={<Customer />} />
+            <Route path="/agent" element={<Agent />} />
+          </Routes>
+        </Router>
       </Container>
-    </Router>
   );
 }
 

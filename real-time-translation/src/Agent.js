@@ -130,7 +130,7 @@ function Agent() {
               // Send the base64 encoded string over the WebSocket
               rawAudioWebSocket.current.send(JSON.stringify({
                   action: 'rawAudio',
-                  message: { "communicator": "CUSTOMER_RAW", "audio_data": base64data }
+                  message: { "communicator": "AGENT_RAW", "audio_data": base64data }
               }));
           };
           reader.readAsDataURL(blob);

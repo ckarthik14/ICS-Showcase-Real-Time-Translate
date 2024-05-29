@@ -10,7 +10,10 @@ def on_message(ws, message):
     partition_key = 'audio'
 
     # Initialize a Kinesis client
-    kinesis_client = boto3.client('kinesis', region_name='us-east-1')
+    kinesis_client = kinesis_client = boto3.client(
+        'kinesis',
+        region_name='us-east-1'
+    )
 
     # Send data to Kinesis
     try:
@@ -28,8 +31,8 @@ def on_error(ws, error):
 def on_close(ws, close_status_code, close_msg):
     print("### closed ###")
     # Reconnect after a delay
-    time.sleep(10)  # Delay before restarting the connection
-    start_websocket()
+    # time.sleep(10)  # Delay before restarting the connection
+    # start_websocket()
 
 def on_open(ws):
     print("WebSocket opened")

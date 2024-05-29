@@ -178,8 +178,8 @@ function Customer() {
     translatedAudioSocket.current = new WebSocket("wss://encgiyvrte.execute-api.us-east-1.amazonaws.com/dev/?communicator=CUSTOMER_RECEIVER&connectionType=TRANSLATED_AUDIO");
 
     translatedAudioSocket.current.onmessage = async (event) => {
-      console.log("Audio data: ", data);
       const data = JSON.parse(event.data);
+      console.log("Audio data: ", data);
       const binaryString = window.atob(data.audio_data);
       const len = binaryString.length;
       const bytes = new Uint8Array(len);
